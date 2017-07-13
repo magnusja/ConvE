@@ -35,7 +35,8 @@ def read_data(file_path):
 def find_negative_sample(s, r, o, s_test_dict, r_dict):
     # subject and relation stay, find a negative object
     potential_os = r_dict[r]
-    while True:
+    potential_o = None
+    for _ in range(50):
         choice = np.random.choice(len(potential_os))
         potential_o = potential_os[choice]
 
@@ -65,6 +66,8 @@ def pre_process(s_dict, r_dict, s_test_dict):
                 index = len(r_to_index)
                 r_to_index[r] = index
                 index_to_r[index] = r
+
+            # sometimes an entity only occurs as an object
             try:
                 _ = e_to_index[o]
             except KeyError:
@@ -76,8 +79,12 @@ def pre_process(s_dict, r_dict, s_test_dict):
             x.append((s, r, o))
             y.append(1)
             # add negative sample
-            x.append(find_negative_sample(s, r, o, s_test_dict, r_dict))
-            y.append(0)
+            _, _, o = find_negative_sample(s, r, o, s_test_dict, r_dict)
+            if o:
+                x.append((s, r, o))
+                y.append(0)
+            else:
+                print('Could not find negative sample for: ', s, r, o)
 
     return x, y, e_to_index, index_to_e, r_to_index, index_to_r
 
