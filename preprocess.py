@@ -38,11 +38,9 @@ def find_negative_sample(s, r, o, s_test_dict, r_dict):
     while True:
         choice = np.random.choice(len(potential_os))
         potential_o = potential_os[choice]
-        if o == potential_o:
-            continue
 
         try:
-            s_test_dict[s][(r, o)]
+            s_test_dict[s][(r, potential_o)]
         except KeyError:
             break
 
