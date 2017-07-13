@@ -60,11 +60,17 @@ def pre_process(s_dict, r_dict, s_test_dict):
 
         for r, o in ro:
             try:
-                _ = r_to_index[s]
+                _ = r_to_index[r]
             except KeyError:
                 index = len(r_to_index)
                 r_to_index[r] = index
                 index_to_r[index] = r
+            try:
+                _ = e_to_index[o]
+            except KeyError:
+                index = len(e_to_index)
+                e_to_index[o] = index
+                index_to_e[index] = o
 
             # add positive sample
             x.append((s, r, o))
