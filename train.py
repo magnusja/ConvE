@@ -32,6 +32,9 @@ def train(epoch, data, conv_e, loss_fn, optimizer, batch_size):
         s, r, _ = x
         s, r = Variable(s).cuda(), Variable(r).cuda()
 
+        if s.size()[0] != batch_size:
+            y_onehot = torch.FloatTensor(s.size()[0], len(data.e_to_index))
+
         y_onehot.zero_()
         y_onehot.scatter_(1, y.view(-1, 1), 1)
 
