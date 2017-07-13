@@ -90,6 +90,14 @@ def main():
         'index_to_r': index_to_r
     }
 
+    print('#entities: ', len(e_to_index))
+    print('#relations: ', len(r_to_index))
+
+    for i in range(50):
+        print(x[i], y[i])
+        choice = np.random.choice(len(e_to_index))
+        assert choice == e_to_index[index_to_e[choice]]
+
     save_file_path = os.path.splitext(file_path)[0] + '.pkl'
     pickle.dump(data, open(save_file_path, 'wb'))
 
