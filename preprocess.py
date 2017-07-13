@@ -90,8 +90,8 @@ def main():
         'index_to_r': index_to_r
     }
 
-    save_file_path = os.path.join(os.path.splitext(file_path), '.pkl')
-    pickle.dump(data, save_file_path)
+    save_file_path = os.path.join(os.path.splitext(file_path)[0], '.pkl')
+    pickle.dump(data, open(save_file_path, 'wb'))
 
 if __name__ == '__main__':
     main()
