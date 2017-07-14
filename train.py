@@ -4,6 +4,7 @@ import argparse
 
 import torch.nn as nn
 import torch
+
 from torch import optim
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
@@ -33,10 +34,11 @@ def train(epoch, data, conv_e, loss_fn, optimizer, batch_size):
 
         y_onehot.zero_()
         y_onehot = y_onehot.scatter_(1, o.view(-1, 1), y.view(-1, 1))
+        targets = Variable(y_onehot, requires_grad=False).float().cuda()
 
         conv_e.zero_grad()
         output = conv_e(s, r)
-        loss = loss_fn(output, Variable(y_onehot, requires_grad=False).float().cuda())
+        loss = loss_fn(output, targets)
         loss.backward()
         optimizer.step()
 
