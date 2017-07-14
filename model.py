@@ -41,6 +41,8 @@ class ConvE(nn.Module):
             nn.Dropout(p=proj_layer_dropout)
         )
 
+        self.sigmoid = nn.Sigmoid()
+
     def forward(self, s, r):
         embed_s = self.embed_e(s)
         embed_r = self.embed_r(r)
@@ -52,4 +54,4 @@ class ConvE(nn.Module):
 
         scores = out.mm(self.embed_e.weight.transpose(0, 1))
 
-        return torch.sigmoid(scores)
+        return self.sigmoid(scores)

@@ -4,10 +4,12 @@ import os
 import numpy as np
 import csv
 import pickle
+import argparse
 
 # s = subject
 # r = relation
 # o = object
+from util import AttributeDict
 
 
 def read_data(file_path):
@@ -48,7 +50,7 @@ def find_negative_sample(s, r, o, s_test_dict, r_dict):
     return s, r, potential_o
 
 
-def pre_process(s_dict, r_dict, s_test_dict):
+def create_dataset(s_dict, r_dict, s_test_dict):
     x, y = list(), list()
     e_to_index, index_to_e, r_to_index, index_to_r = dict(), dict(), dict(), dict()
     for s, ro in s_dict.items():
@@ -89,10 +91,9 @@ def pre_process(s_dict, r_dict, s_test_dict):
     return x, y, e_to_index, index_to_e, r_to_index, index_to_r
 
 
-def main():
-    file_path = sys.argv[1]
+def preprocess_train(file_path):
     s_dict, r_dict, s_test_dict = read_data(file_path)
-    x, y, e_to_index, index_to_e, r_to_index, index_to_r = pre_process(s_dict, r_dict, s_test_dict)
+    x, y, e_to_index, index_to_e, r_to_index, index_to_r = create_dataset(s_dict, r_dict, s_test_dict)
 
     data = {
         'x': x,
@@ -115,6 +116,62 @@ def main():
 
     save_file_path = os.path.splitext(file_path)[0] + '.pkl'
     pickle.dump(data, open(save_file_path, 'wb'))
+
+
+def preprocess_valid(train_path, valid_path):
+    x, y = list(), list()
+    with open(train_path, 'rb') as f:
+        train_data = AttributeDict(pickle.load(f))
+
+    s_dict, _, _ = read_data(valid_path)
+    for s, ro in s_dict.items():
+        try:
+            _ = train_data.e_to_index[s]
+        except KeyError:
+            continue
+
+        for r, o in ro:
+            try:
+                _ = train_data.r_to_index[r]
+            except KeyError:
+                continue
+
+            # sometimes an entity only occurs as an object
+            try:
+                _ = train_data.e_to_index[o]
+            except KeyError:
+                continue
+
+            x.append((s, r, o))
+            y.append(1)
+
+    data = {
+        'x': x,
+        'y': y,
+    }
+
+    save_file_path = os.path.splitext(valid_path)[0] + '.pkl'
+    pickle.dump(data, open(save_file_path, 'wb'))
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description='Preprocess knowledge graph csv train/valid (test) data.')
+    sub_parsers = parser.add_subparsers(help='mode', dest='mode')
+    sub_parsers.required = True
+    train_parser = sub_parsers.add_parser('train', help='Preprocess a training set')
+    valid_parser = sub_parsers.add_parser('valid', help='Preprocess a valid or test set')
+    train_parser.add_argument('train_path', action='store', type=str)
+
+    valid_parser.add_argument('train_path', action='store', type=str)
+    valid_parser.add_argument('valid_path', action='store', type=str)
+    return parser.parse_args()
+
+
+def main():
+    args = parse_args()
+    if args.mode == 'train':
+        preprocess_train(args.train_path)
+
 
 if __name__ == '__main__':
     main()

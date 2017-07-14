@@ -11,11 +11,7 @@ from tqdm import tqdm
 
 from dataset import KnowledgeGraphDataset
 from model import ConvE
-
-
-class AttributeDict(dict):
-    __getattr__ = dict.__getitem__
-    __setattr__ = dict.__setitem__
+from util import AttributeDict
 
 
 def train(epoch, data, conv_e, loss_fn, optimizer, batch_size):
@@ -100,8 +96,8 @@ def main():
 
     for epoch in range(args.epochs):
         train(epoch, train_data, conv_e, loss, optimizer, args.batch_size)
-        valid(valid_data, conv_e, args.batch_size)
         valid(train_data, conv_e, args.batch_size)
+        valid(valid_data, conv_e, args.batch_size)
 
         with open('checkpoint/checkpoint_{}.model'.format(str(epoch + 1).zfill(2)), 'wb') as f:
             torch.save(conv_e, f)
