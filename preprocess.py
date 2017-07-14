@@ -171,6 +171,8 @@ def main():
     args = parse_args()
     if args.mode == 'train':
         preprocess_train(args.train_path)
+    else:
+        preprocess_valid(args.train_path, args.valid_path)
 
 
 if __name__ == '__main__':
