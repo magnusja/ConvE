@@ -38,8 +38,7 @@ class ConvE(nn.Module):
             nn.Linear(in_features=flattened_size, out_features=embedding_size),
             nn.ReLU(),
             nn.BatchNorm1d(num_features=embedding_size),
-            nn.Dropout(p=proj_layer_dropout),
-            nn.Linear(in_features=embedding_size, out_features=self.num_e)
+            nn.Dropout(p=proj_layer_dropout)
         )
 
     def forward(self, s, r):
@@ -51,6 +50,6 @@ class ConvE(nn.Module):
         conv_input = torch.stack([embed_s, embed_r], dim=1)
         out = self.conv_e(conv_input)
 
-        scores = out
+        scores = out.mm(self.embed_e.weight.transpose(0, 1))
 
         return torch.sigmoid(scores)
