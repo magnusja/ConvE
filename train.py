@@ -25,8 +25,7 @@ def train(epoch, data, conv_e, loss_fn, optimizer, batch_size):
 
     conv_e.train(True)
     y_onehot = torch.LongTensor(batch_size, len(data.e_to_index))
-    for x, y in progress_bar:
-        s, r, o = x
+    for s, r, o, y in progress_bar:
         s, r = Variable(s).cuda(), Variable(r).cuda()
 
         if s.size()[0] != batch_size:
@@ -57,8 +56,7 @@ def valid(data, conv_e, batch_size):
 
     conv_e.train(False)
     correct_count = 0
-    for x, y in tqdm(iter(valid_set)):
-        s, r, o = x
+    for s, r, o, y in tqdm(iter(valid_set)):
         s, r = Variable(s).cuda(), Variable(r).cuda()
 
         output = conv_e(s, r)

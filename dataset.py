@@ -15,4 +15,4 @@ class KnowledgeGraphDataset(Dataset):
 
     def __getitem__(self, item):
         s, r, o = self.x[item]
-        return (self.e_to_index[s], self.r_to_index[r], self.e_to_index[o]), self.y[item]
+        return self.e_to_index[s], self.r_to_index[r], self.e_to_index[o], self.y[item]
