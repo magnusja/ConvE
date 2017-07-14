@@ -27,20 +27,20 @@ def train(epoch, data, conv_e, loss_fn, optimizer, batch_size):
     moving_loss = 0
 
     conv_e.train(True)
-    y_onehot = torch.FloatTensor(batch_size, len(data.e_to_index))
+    y_onehot = torch.LongTensor(batch_size, len(data.e_to_index))
     for x, y in progress_bar:
-        s, r, _ = x
+        s, r, o = x
         s, r = Variable(s).cuda(), Variable(r).cuda()
 
         if s.size()[0] != batch_size:
-            y_onehot = torch.FloatTensor(s.size()[0], len(data.e_to_index))
+            y_onehot = torch.LongTensor(s.size()[0], len(data.e_to_index))
 
         y_onehot.zero_()
-        y_onehot.scatter_(1, y.view(-1, 1), 1)
+        y_onehot = y_onehot.scatter_(1, o.view(-1, 1), y.view(-1, 1))
 
         conv_e.zero_grad()
         output = conv_e(s, r)
-        loss = loss_fn(output, Variable(y_onehot).cuda())
+        loss = loss_fn(output, Variable(y_onehot).float().cuda())
         loss.backward()
         optimizer.step()
 
@@ -61,11 +61,13 @@ def valid(data, conv_e, batch_size):
     correct_count = 0
     for x, y in tqdm(iter(valid_set)):
         s, r, o = x
-        s, r, o = Variable(s).cuda(), Variable(r).cuda(), Variable(o).cuda()
+        s, r = Variable(s).cuda(), Variable(r).cuda()
 
         output = conv_e(s, r)
-        if output.data.cpu().numpy().argmax(1) == data.e_to_index[o]:
-            correct_count += correct_count
+        values, indices = output.data.max(1)
+
+        correct = indices == o.cuda()
+        correct_count += correct.sum()
 
     print('Avg Acc: {:.5f}'.format(correct_count /
                                    len(dataset)))
@@ -76,7 +78,7 @@ def main():
     parser.add_argument('train_path', action='store', type=str)
     parser.add_argument('valid_path', action='store', type=str)
     parser.add_argument('--batch-size', action='store', type=int, dest='batch_size', default=128)
-    parser.add_argument('--epochs', action='store', type=str, dest='epochs', default=30)
+    parser.add_argument('--epochs', action='store', type=int, dest='epochs', default=30)
 
     args = parser.parse_args()
 
@@ -93,6 +95,7 @@ def main():
     for epoch in range(args.epochs):
         train(epoch, train_data, conv_e, loss, optimizer, args.batch_size)
         valid(valid_data, conv_e, args.batch_size)
+        valid(train_data, conv_e, args.batch_size)
 
         with open('checkpoint/checkpoint_{}.model'.format(str(epoch + 1).zfill(2)), 'wb') as f:
             torch.save(conv_e, f)
