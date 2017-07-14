@@ -40,7 +40,7 @@ def train(epoch, data, conv_e, loss_fn, optimizer, batch_size):
 
         conv_e.zero_grad()
         output = conv_e(s, r)
-        loss = loss_fn(output, Variable(y_onehot).float().cuda())
+        loss = loss_fn(output, Variable(y_onehot, requires_grad=False).float().cuda())
         loss.backward()
         optimizer.step()
 
@@ -88,9 +88,15 @@ def main():
     with open(args.valid_path, 'rb') as f:
         valid_data = AttributeDict(pickle.load(f))
 
+    # always use training data dictionaries
+    valid_data.e_to_index = train_data.e_to_index
+    valid_data.index_to_e = train_data.index_to_e
+    valid_data.r_to_index = train_data.r_to_index
+    valid_data.index_to_r = train_data.index_to_r
+
     conv_e = ConvE(num_e=len(train_data.e_to_index), num_r=len(train_data.r_to_index)).cuda()
     loss = nn.BCELoss()
-    optimizer = optim.Adam(conv_e.parameters(), lr=0.001)
+    optimizer = optim.Adam(conv_e.parameters(), lr=0.0001)
 
     for epoch in range(args.epochs):
         train(epoch, train_data, conv_e, loss, optimizer, args.batch_size)

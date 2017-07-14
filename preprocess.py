@@ -106,10 +106,12 @@ def main():
     print('#entities: ', len(e_to_index))
     print('#relations: ', len(r_to_index))
 
-    for i in range(50):
+    for i in range(np.minimum(len(x), 200)):
         print(x[i], y[i])
         choice = np.random.choice(len(e_to_index))
         assert choice == e_to_index[index_to_e[choice]]
+        choice = np.random.choice(len(r_to_index))
+        assert choice == r_to_index[index_to_r[choice]]
 
     save_file_path = os.path.splitext(file_path)[0] + '.pkl'
     pickle.dump(data, open(save_file_path, 'wb'))
