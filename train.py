@@ -33,13 +33,15 @@ def train(epoch, data, conv_e, loss_fn, optimizer, batch_size):
 
         y_onehot.zero_()
         y_onehot = y_onehot.scatter_(1, o.view(-1, 1), y.view(-1, 1))
-        targets = Variable(y_onehot, requires_grad=False).float().cuda()
+        y_smooth = (1 - 0.1) * y_onehot.float() + 0.1 / len(data.e_to_index)
 
-        conv_e.zero_grad()
+        targets = Variable(y_onehot.float(), requires_grad=False).cuda()
+
         output = conv_e(s, r)
         loss = loss_fn(output, targets)
         loss.backward()
         optimizer.step()
+        conv_e.zero_grad()
 
         if moving_loss == 0:
             moving_loss = loss.data[0]
@@ -51,22 +53,25 @@ def train(epoch, data, conv_e, loss_fn, optimizer, batch_size):
 
 
 def valid(data, conv_e, batch_size):
+    def mrr(ranks):
+        return (1 / ranks).mean()
     dataset = KnowledgeGraphDataset(data.x, data.y, e_to_index=data.e_to_index, r_to_index=data.r_to_index)
     valid_set = DataLoader(dataset, batch_size=batch_size, num_workers=4, shuffle=True)
 
     conv_e.train(False)
-    correct_count = 0
+    running_mrr = .0
     for s, r, o, y in tqdm(iter(valid_set)):
-        s, r = Variable(s).cuda(), Variable(r).cuda()
+        s, r, o = Variable(s).cuda(), Variable(r).cuda(), Variable(o).cuda()
 
         output = conv_e(s, r)
-        values, indices = output.data.max(1)
+        correct_probs = output.gather(1, o.unsqueeze(1))
+        correct_probs = correct_probs.expand(correct_probs.size()[0], len(data.e_to_index))
+        ranks = (output > correct_probs).sum() + 1
 
-        correct = indices == o.cuda()
-        correct_count += correct.sum()
+        running_mrr = (running_mrr + mrr(ranks.float()).data[0]) / 2
 
-    print('Avg Acc: {:.5f}'.format(correct_count /
-                                   len(dataset)))
+    print()
+    print('MRR: {:.5f}'.format(running_mrr))
 
 
 def main():
