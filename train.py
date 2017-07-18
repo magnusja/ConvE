@@ -15,7 +15,17 @@ from model import ConvE
 from util import AttributeDict
 
 
-def train(epoch, data, conv_e, loss_fn, optimizer, batch_size):
+class StableBCELoss(nn.modules.Module):
+    def __init__(self):
+        super(StableBCELoss, self).__init__()
+
+    def forward(self, input, target):
+        neg_abs = - input.abs()
+        loss = input.clamp(min=0) - input * target + (1 + neg_abs.exp()).log()
+        return loss.mean()
+
+
+def train(epoch, data, conv_e, criterion, optimizer, batch_size):
     train_set = DataLoader(
         KnowledgeGraphDataset(data.x, data.y, e_to_index=data.e_to_index, r_to_index=data.r_to_index),
         batch_size=batch_size, num_workers=4, shuffle=True)
@@ -38,7 +48,7 @@ def train(epoch, data, conv_e, loss_fn, optimizer, batch_size):
         targets = Variable(y_onehot.float(), requires_grad=False).cuda()
 
         output = conv_e(s, r)
-        loss = loss_fn(output, targets)
+        loss = criterion(output, targets)
         loss.backward()
         optimizer.step()
         conv_e.zero_grad()
@@ -66,12 +76,12 @@ def valid(data, conv_e, batch_size):
         output = conv_e(s, r)
         correct_probs = output.gather(1, o.unsqueeze(1))
         correct_probs = correct_probs.expand(correct_probs.size()[0], len(data.e_to_index))
-        ranks = (output > correct_probs).sum() + 1
+        ranks = (output > correct_probs).float().sum() + 1
 
-        running_mrr = (running_mrr + mrr(ranks.float()).data[0]) / 2
+        running_mrr = (running_mrr + mrr(ranks).data[0]) / 2
 
     print()
-    print('MRR: {:.5f}'.format(running_mrr))
+    print('MRR: {:.10f}'.format(running_mrr))
 
 
 def main():
@@ -96,11 +106,11 @@ def main():
     valid_data.index_to_r = train_data.index_to_r
 
     conv_e = ConvE(num_e=len(train_data.e_to_index), num_r=len(train_data.r_to_index)).cuda()
-    loss = nn.BCELoss()
+    criterion = StableBCELoss()
     optimizer = optim.Adam(conv_e.parameters(), lr=0.0001)
 
     for epoch in range(args.epochs):
-        train(epoch, train_data, conv_e, loss, optimizer, args.batch_size)
+        train(epoch, train_data, conv_e, criterion, optimizer, args.batch_size)
         valid(train_data, conv_e, args.batch_size)
         valid(valid_data, conv_e, args.batch_size)
 

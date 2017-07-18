@@ -53,4 +53,4 @@ class ConvE(nn.Module):
 
         scores = out.mm(self.embed_e.weight.t())
 
-        return F.sigmoid(scores)
+        return (scores)
