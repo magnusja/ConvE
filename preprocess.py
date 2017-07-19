@@ -14,43 +14,18 @@ from util import AttributeDict
 
 def read_data(file_path):
     s_dict = dict()
-    r_dict = dict()
-    s_test_dict = dict()
     with open(file_path) as csv_file:
         csv_reader = csv.reader(csv_file, delimiter='\t')
         for s, r, o in csv_reader:
             try:
                 s_dict[s].append((r, o))
-                s_test_dict[s][(r, o)] = True
             except KeyError:
                 s_dict[s] = [(r, o)]
-                s_test_dict[s] = {(r, o): True}
 
-            try:
-                r_dict[r].append(o)
-            except KeyError:
-                r_dict[r] = [o]
-
-    return s_dict, r_dict, s_test_dict
+    return s_dict
 
 
-def find_negative_sample(s, r, o, s_test_dict, r_dict):
-    # subject and relation stay, find a negative object
-    potential_os = r_dict[r]
-    potential_o = None
-    for _ in range(50):
-        choice = np.random.choice(len(potential_os))
-        potential_o = potential_os[choice]
-
-        try:
-            s_test_dict[s][(r, potential_o)]
-        except KeyError:
-            break
-
-    return s, r, potential_o
-
-
-def create_dataset(s_dict, r_dict, s_test_dict):
+def create_dataset(s_dict):
     x, y = list(), list()
     e_to_index, index_to_e, r_to_index, index_to_r = dict(), dict(), dict(), dict()
     for s, ro in s_dict.items():
@@ -80,20 +55,13 @@ def create_dataset(s_dict, r_dict, s_test_dict):
             # add positive sample
             x.append((s, r, o))
             y.append(1)
-            # add negative sample
-            _, _, o = find_negative_sample(s, r, o, s_test_dict, r_dict)
-            if o:
-                x.append((s, r, o))
-                y.append(0)
-            else:
-                print('Could not find negative sample for: ', s, r, o)
 
     return x, y, e_to_index, index_to_e, r_to_index, index_to_r
 
 
 def preprocess_train(file_path):
-    s_dict, r_dict, s_test_dict = read_data(file_path)
-    x, y, e_to_index, index_to_e, r_to_index, index_to_r = create_dataset(s_dict, r_dict, s_test_dict)
+    s_dict = read_data(file_path)
+    x, y, e_to_index, index_to_e, r_to_index, index_to_r = create_dataset(s_dict)
 
     data = {
         'x': x,
@@ -123,7 +91,7 @@ def preprocess_valid(train_path, valid_path):
     with open(train_path, 'rb') as f:
         train_data = AttributeDict(pickle.load(f))
 
-    s_dict, _, _ = read_data(valid_path)
+    s_dict = read_data(valid_path)
     for s, ro in s_dict.items():
         try:
             _ = train_data.e_to_index[s]
