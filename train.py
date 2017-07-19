@@ -10,7 +10,7 @@ from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from dataset import KnowledgeGraphDataset, collate_data
+from dataset import KnowledgeGraphDataset, collate_data, collate_valid
 from model import ConvE
 from util import AttributeDict
 
@@ -64,21 +64,23 @@ def train(epoch, data, conv_e, criterion, optimizer, batch_size):
 
 def valid(data, conv_e, batch_size):
     def mrr(ranks):
-        return (1 / ranks).mean()
+        return torch.mean(1 / ranks)
     dataset = KnowledgeGraphDataset(data.x, data.y, e_to_index=data.e_to_index, r_to_index=data.r_to_index)
-    valid_set = DataLoader(dataset, collate_fn=collate_data, batch_size=batch_size, num_workers=4, shuffle=True)
+    valid_set = DataLoader(dataset, collate_fn=collate_valid, batch_size=batch_size, num_workers=4, shuffle=True)
 
     conv_e.train(False)
     running_mrr = .0
     for s, r, os in tqdm(iter(valid_set)):
-        s, r, os = Variable(s).cuda(), Variable(r).cuda(), Variable(os).cuda()
-
+        s, r = Variable(s).cuda(), Variable(r).cuda()
+        ranks = list()
         output = conv_e.test(s, r)
-        correct_probs = output.gather(1, os.unsqueeze(1))
-        correct_probs = correct_probs.expand(correct_probs.size()[0], len(data.e_to_index))
-        ranks = (output > correct_probs).float().sum() + 1
+        for i in range(min(batch_size, s.size()[0])):
+            _, top_indices = output[i].topk(output.size()[1])
+            for o in os[i]:
+                _, rank = (top_indices == o).max(dim=0)
+                ranks.append(rank.data[0] + 1)
 
-        running_mrr = (running_mrr + mrr(ranks).data[0]) / 2
+        running_mrr = (running_mrr + mrr(torch.FloatTensor(ranks))) / 2
 
     print()
     print('MRR: {:.10f}'.format(running_mrr))

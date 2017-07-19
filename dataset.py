@@ -32,3 +32,8 @@ def collate_data(batch):
 
     s, o, i = zip(*batch)
     return torch.LongTensor(s), torch.LongTensor(o), torch.LongTensor(i)
+
+
+def collate_valid(batch):
+    s, o, i = zip(*batch)
+    return torch.LongTensor(s), torch.LongTensor(o), list(i)
