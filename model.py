@@ -22,7 +22,7 @@ class ConvE(nn.Module):
         self.embedding_size_w = embedding_size_w
 
         embedding_size = embedding_size_h * embedding_size_w
-        flattened_size = (embedding_size_w - conv_kernel_size + 1) * \
+        flattened_size = (embedding_size_w * 2 - conv_kernel_size + 1) * \
                          (embedding_size_h - conv_kernel_size + 1) * conv_channels
 
         self.embed_e = nn.Embedding(num_embeddings=self.num_e, embedding_dim=embedding_size)
@@ -30,7 +30,7 @@ class ConvE(nn.Module):
 
         self.conv_e = nn.Sequential(
             nn.Dropout(p=embed_dropout),
-            nn.Conv2d(in_channels=2, out_channels=conv_channels, kernel_size=conv_kernel_size),
+            nn.Conv2d(in_channels=1, out_channels=conv_channels, kernel_size=conv_kernel_size),
             nn.ReLU(),
             nn.BatchNorm2d(num_features=conv_channels),
             nn.Dropout2d(p=feature_map_dropout),
@@ -48,9 +48,12 @@ class ConvE(nn.Module):
 
         embed_s = embed_s.view(-1, self.embedding_size_w, self.embedding_size_h)
         embed_r = embed_r.view(-1, self.embedding_size_w, self.embedding_size_h)
-        conv_input = torch.stack([embed_s, embed_r], dim=1)
+        conv_input = torch.cat([embed_s, embed_r], dim=1).unsqueeze(1)
         out = self.conv_e(conv_input)
 
         scores = out.mm(self.embed_e.weight.t())
 
-        return (scores)
+        return scores
+
+    def test(self, s, r):
+        return F.sigmoid(self(s, r))

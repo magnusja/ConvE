@@ -73,7 +73,7 @@ def valid(data, conv_e, batch_size):
     for s, r, o, y in tqdm(iter(valid_set)):
         s, r, o = Variable(s).cuda(), Variable(r).cuda(), Variable(o).cuda()
 
-        output = conv_e(s, r)
+        output = conv_e.test(s, r)
         correct_probs = output.gather(1, o.unsqueeze(1))
         correct_probs = correct_probs.expand(correct_probs.size()[0], len(data.e_to_index))
         ranks = (output > correct_probs).float().sum() + 1
@@ -88,8 +88,8 @@ def main():
     parser = argparse.ArgumentParser(description='Train ConvE with PyTorch.')
     parser.add_argument('train_path', action='store', type=str)
     parser.add_argument('valid_path', action='store', type=str)
-    parser.add_argument('--batch-size', action='store', type=int, dest='batch_size', default=128)
-    parser.add_argument('--epochs', action='store', type=int, dest='epochs', default=30)
+    parser.add_argument('--batch-size', action='store', type=int, dest='batch_size', default=256)
+    parser.add_argument('--epochs', action='store', type=int, dest='epochs', default=90)
 
     args = parser.parse_args()
 
@@ -107,7 +107,7 @@ def main():
 
     conv_e = ConvE(num_e=len(train_data.e_to_index), num_r=len(train_data.r_to_index)).cuda()
     criterion = StableBCELoss()
-    optimizer = optim.Adam(conv_e.parameters(), lr=0.0001)
+    optimizer = optim.Adam(conv_e.parameters(), lr=0.003)
 
     for epoch in range(args.epochs):
         train(epoch, train_data, conv_e, criterion, optimizer, args.batch_size)
