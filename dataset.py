@@ -1,3 +1,6 @@
+from itertools import repeat
+
+import torch
 from torch.utils.data import Dataset
 
 
@@ -14,5 +17,18 @@ class KnowledgeGraphDataset(Dataset):
         return len(self.x)
 
     def __getitem__(self, item):
-        s, r, o = self.x[item]
-        return self.e_to_index[s], self.r_to_index[r], self.e_to_index[o], self.y[item]
+        s, r = self.x[item]
+        os = self.y[item]
+        indices = [self.e_to_index[o] for o in os]
+        return self.e_to_index[s], self.r_to_index[r], indices
+
+
+def collate_data(batch):
+    max_len = max(map(lambda x: len(x[2]), batch))
+
+    # each object index list must have same length (to use torch.scatter_), therefore we pad with the first index
+    for _, _, indices in batch:
+        indices.extend(repeat(indices[0], max_len - len(indices)))
+
+    s, o, i = zip(*batch)
+    return torch.LongTensor(s), torch.LongTensor(o), torch.LongTensor(i)

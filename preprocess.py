@@ -18,9 +18,10 @@ def read_data(file_path):
         csv_reader = csv.reader(csv_file, delimiter='\t')
         for s, r, o in csv_reader:
             try:
-                s_dict[s].append((r, o))
+                s_dict[s][r].append(o)
             except KeyError:
-                s_dict[s] = [(r, o)]
+                s_dict[s] = dict()
+                s_dict[s][r] = [o]
 
     return s_dict
 
@@ -36,7 +37,7 @@ def create_dataset(s_dict):
             e_to_index[s] = index
             index_to_e[index] = s
 
-        for r, o in ro:
+        for r, os in ro.items():
             try:
                 _ = r_to_index[r]
             except KeyError:
@@ -44,17 +45,17 @@ def create_dataset(s_dict):
                 r_to_index[r] = index
                 index_to_r[index] = r
 
-            # sometimes an entity only occurs as an object
-            try:
-                _ = e_to_index[o]
-            except KeyError:
-                index = len(e_to_index)
-                e_to_index[o] = index
-                index_to_e[index] = o
+            for o in os:
+                # sometimes an entity only occurs as an object
+                try:
+                    _ = e_to_index[o]
+                except KeyError:
+                    index = len(e_to_index)
+                    e_to_index[o] = index
+                    index_to_e[index] = o
 
-            # add positive sample
-            x.append((s, r, o))
-            y.append(1)
+            x.append((s, r))
+            y.append(os)
 
     return x, y, e_to_index, index_to_e, r_to_index, index_to_r
 
@@ -98,20 +99,24 @@ def preprocess_valid(train_path, valid_path):
         except KeyError:
             continue
 
-        for r, o in ro:
+        for r, objects in ro.items():
             try:
                 _ = train_data.r_to_index[r]
             except KeyError:
                 continue
 
-            # sometimes an entity only occurs as an object
-            try:
-                _ = train_data.e_to_index[o]
-            except KeyError:
-                continue
+            filtered_objects = list()
 
-            x.append((s, r, o))
-            y.append(1)
+            for o in objects:
+                # sometimes an entity only occurs as an object
+                try:
+                    _ = train_data.e_to_index[o]
+                    filtered_objects.append(o)
+                except KeyError:
+                    continue
+
+            x.append((s, r))
+            y.append(filtered_objects)
 
     data = {
         'x': x,

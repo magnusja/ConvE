@@ -10,7 +10,7 @@ from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from dataset import KnowledgeGraphDataset
+from dataset import KnowledgeGraphDataset, collate_data
 from model import ConvE
 from util import AttributeDict
 
@@ -28,21 +28,21 @@ class StableBCELoss(nn.modules.Module):
 def train(epoch, data, conv_e, criterion, optimizer, batch_size):
     train_set = DataLoader(
         KnowledgeGraphDataset(data.x, data.y, e_to_index=data.e_to_index, r_to_index=data.r_to_index),
-        batch_size=batch_size, num_workers=4, shuffle=True)
+        collate_fn=collate_data, batch_size=batch_size, num_workers=4, shuffle=True)
 
     progress_bar = tqdm(iter(train_set))
     moving_loss = 0
 
     conv_e.train(True)
     y_onehot = torch.LongTensor(batch_size, len(data.e_to_index))
-    for s, r, o, y in progress_bar:
+    for s, r, os in progress_bar:
         s, r = Variable(s).cuda(), Variable(r).cuda()
 
         if s.size()[0] != batch_size:
             y_onehot = torch.LongTensor(s.size()[0], len(data.e_to_index))
 
         y_onehot.zero_()
-        y_onehot = y_onehot.scatter_(1, o.view(-1, 1), y.view(-1, 1))
+        y_onehot = y_onehot.scatter_(1, os, 1)
         y_smooth = (1 - 0.1) * y_onehot.float() + 0.1 / len(data.e_to_index)
 
         targets = Variable(y_onehot.float(), requires_grad=False).cuda()
@@ -66,15 +66,15 @@ def valid(data, conv_e, batch_size):
     def mrr(ranks):
         return (1 / ranks).mean()
     dataset = KnowledgeGraphDataset(data.x, data.y, e_to_index=data.e_to_index, r_to_index=data.r_to_index)
-    valid_set = DataLoader(dataset, batch_size=batch_size, num_workers=4, shuffle=True)
+    valid_set = DataLoader(dataset, collate_fn=collate_data, batch_size=batch_size, num_workers=4, shuffle=True)
 
     conv_e.train(False)
     running_mrr = .0
-    for s, r, o, y in tqdm(iter(valid_set)):
-        s, r, o = Variable(s).cuda(), Variable(r).cuda(), Variable(o).cuda()
+    for s, r, os in tqdm(iter(valid_set)):
+        s, r, os = Variable(s).cuda(), Variable(r).cuda(), Variable(os).cuda()
 
         output = conv_e.test(s, r)
-        correct_probs = output.gather(1, o.unsqueeze(1))
+        correct_probs = output.gather(1, os.unsqueeze(1))
         correct_probs = correct_probs.expand(correct_probs.size()[0], len(data.e_to_index))
         ranks = (output > correct_probs).float().sum() + 1
 
