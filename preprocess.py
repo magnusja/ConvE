@@ -20,7 +20,8 @@ def read_data(file_path):
             try:
                 s_dict[s][r].append(o)
             except KeyError:
-                s_dict[s] = dict()
+                if s_dict.get(s) is None:
+                    s_dict[s] = dict()
                 s_dict[s][r] = [o]
 
     return s_dict
