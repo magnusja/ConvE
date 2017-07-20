@@ -10,7 +10,7 @@ from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from dataset import KnowledgeGraphDataset, collate_data, collate_valid
+from dataset import KnowledgeGraphDataset, collate_train, collate_valid
 from model import ConvE
 from util import AttributeDict
 
@@ -28,7 +28,7 @@ class StableBCELoss(nn.modules.Module):
 def train(epoch, data, conv_e, criterion, optimizer, batch_size):
     train_set = DataLoader(
         KnowledgeGraphDataset(data.x, data.y, e_to_index=data.e_to_index, r_to_index=data.r_to_index),
-        collate_fn=collate_data, batch_size=batch_size, num_workers=4, shuffle=True)
+        collate_fn=collate_train, batch_size=batch_size, num_workers=4, shuffle=True)
 
     progress_bar = tqdm(iter(train_set))
     moving_loss = 0
@@ -63,27 +63,27 @@ def train(epoch, data, conv_e, criterion, optimizer, batch_size):
 
 
 def valid(data, conv_e, batch_size):
-    def mrr(ranks):
-        return torch.mean(1 / ranks)
     dataset = KnowledgeGraphDataset(data.x, data.y, e_to_index=data.e_to_index, r_to_index=data.r_to_index)
     valid_set = DataLoader(dataset, collate_fn=collate_valid, batch_size=batch_size, num_workers=4, shuffle=True)
 
     conv_e.train(False)
-    running_mrr = .0
+    ranks = list()
     for s, r, os in tqdm(iter(valid_set)):
         s, r = Variable(s).cuda(), Variable(r).cuda()
-        ranks = list()
         output = conv_e.test(s, r)
+
         for i in range(min(batch_size, s.size()[0])):
             _, top_indices = output[i].topk(output.size()[1])
             for o in os[i]:
                 _, rank = (top_indices == o).max(dim=0)
                 ranks.append(rank.data[0] + 1)
 
-        running_mrr = (running_mrr + mrr(torch.FloatTensor(ranks))) / 2
+    ranks_t = torch.FloatTensor(ranks)
+    mr = ranks_t.mean()
+    mrr = (1 / ranks_t).mean()
 
     print()
-    print('MRR: {:.10f}'.format(running_mrr))
+    print('MR: {:.3f}, MRR: {:.10f}'.format(mr, mrr))
 
 
 def main():
@@ -113,8 +113,9 @@ def main():
 
     for epoch in range(args.epochs):
         train(epoch, train_data, conv_e, criterion, optimizer, args.batch_size)
-        valid(train_data, conv_e, args.batch_size)
-        valid(valid_data, conv_e, args.batch_size)
+        if epoch % 3 == 0:
+            valid(train_data, conv_e, args.batch_size)
+            valid(valid_data, conv_e, args.batch_size)
 
         with open('checkpoint/checkpoint_{}.model'.format(str(epoch + 1).zfill(2)), 'wb') as f:
             torch.save(conv_e, f)

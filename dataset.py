@@ -23,7 +23,7 @@ class KnowledgeGraphDataset(Dataset):
         return self.e_to_index[s], self.r_to_index[r], indices
 
 
-def collate_data(batch):
+def collate_train(batch):
     max_len = max(map(lambda x: len(x[2]), batch))
 
     # each object index list must have same length (to use torch.scatter_), therefore we pad with the first index
