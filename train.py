@@ -3,8 +3,11 @@ import pickle
 import argparse
 
 import logging
+
+import shutil
 import torch.nn as nn
 import torch
+from tensorboard_logger import tensorboard_logger
 
 from torch import optim
 from torch.autograd import Variable
@@ -65,9 +68,11 @@ def train(epoch, data, conv_e, criterion, optimizer, args):
             'Epoch: {}; Loss: {:.5f}; Avg: {:.5f}'.format(epoch + 1, loss.data[0], moving_loss))
 
     logger.info('Epoch: {}; Loss: {:.5f}; Avg: {:.5f}'.format(epoch + 1, loss.data[0], moving_loss))
+    tensorboard_logger.log_value('avg loss', moving_loss, epoch + 1)
+    tensorboard_logger.log_value('loss', loss.data[0], epoch + 1)
 
 
-def valid(data, conv_e, batch_size):
+def valid(epoch, data, conv_e, batch_size, log_decs):
     dataset = KnowledgeGraphDataset(data.x, data.y, e_to_index=data.e_to_index, r_to_index=data.r_to_index)
     valid_set = DataLoader(dataset, collate_fn=collate_valid, batch_size=batch_size, num_workers=4, shuffle=True)
 
@@ -87,7 +92,9 @@ def valid(data, conv_e, batch_size):
     mr = ranks_t.mean()
     mrr = (1 / ranks_t).mean()
 
-    logger.info('MR: {:.3f}, MRR: {:.10f}'.format(mr, mrr))
+    logger.info(log_decs + ' MR: {:.3f}, MRR: {:.10f}'.format(mr, mrr))
+    tensorboard_logger.log_value(log_decs + ' mr', mr, epoch + 1)
+    tensorboard_logger.log_value(log_decs + ' mrr', mrr, epoch + 1)
 
 
 def parse_args():
@@ -108,6 +115,8 @@ def parse_args():
 
 def setup_logger(args):
     log_file = args.log_file
+    tensorboard_log_dir = 'tensorboard_' + args.name
+    shutil.rmtree(tensorboard_log_dir)
     if args.log_file is None:
         if args.name == '':
             log_file = 'train.log'
@@ -117,6 +126,7 @@ def setup_logger(args):
     print('Logging to: ' + log_file)
 
     logging.basicConfig(filename=log_file, level=logging.INFO)
+    tensorboard_logger.configure(tensorboard_log_dir)
 
 
 def main():
@@ -143,8 +153,8 @@ def main():
 
     for epoch in trange(args.epochs):
         train(epoch, train_data, conv_e, criterion, optimizer, args)
-        valid(train_data, conv_e, args.batch_size)
-        valid(valid_data, conv_e, args.batch_size)
+        valid(epoch, train_data, conv_e, args.batch_size, 'train')
+        valid(epoch, valid_data, conv_e, args.batch_size, 'valid')
 
         with open('{}/checkpoint_{}.model'.format(checkpoint_path, str(epoch + 1).zfill(2)), 'wb') as f:
             torch.save(conv_e, f)
