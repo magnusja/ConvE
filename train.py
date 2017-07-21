@@ -2,6 +2,7 @@ import os
 import pickle
 import argparse
 
+import logging
 import torch.nn as nn
 import torch
 
@@ -13,6 +14,8 @@ from tqdm import tqdm, trange
 from dataset import KnowledgeGraphDataset, collate_train, collate_valid
 from model import ConvE
 from util import AttributeDict
+
+logger = logging.getLogger(__file__)
 
 
 class StableBCELoss(nn.modules.Module):
@@ -61,6 +64,8 @@ def train(epoch, data, conv_e, criterion, optimizer, args):
         progress_bar.set_description(
             'Epoch: {}; Loss: {:.5f}; Avg: {:.5f}'.format(epoch + 1, loss.data[0], moving_loss))
 
+    logger.info('Epoch: {}; Loss: {:.5f}; Avg: {:.5f}'.format(epoch + 1, loss.data[0], moving_loss))
+
 
 def valid(data, conv_e, batch_size):
     dataset = KnowledgeGraphDataset(data.x, data.y, e_to_index=data.e_to_index, r_to_index=data.r_to_index)
@@ -82,11 +87,10 @@ def valid(data, conv_e, batch_size):
     mr = ranks_t.mean()
     mrr = (1 / ranks_t).mean()
 
-    print()
-    print('MR: {:.3f}, MRR: {:.10f}'.format(mr, mrr))
+    logger.info('MR: {:.3f}, MRR: {:.10f}'.format(mr, mrr))
 
 
-def main():
+def parse_args():
     parser = argparse.ArgumentParser(description='Train ConvE with PyTorch.')
     parser.add_argument('train_path', action='store', type=str,
                         help='Path to training .pkl produced by preprocess.py')
@@ -97,8 +101,28 @@ def main():
     parser.add_argument('--batch-size', action='store', type=int, dest='batch_size', default=256)
     parser.add_argument('--epochs', action='store', type=int, dest='epochs', default=90)
     parser.add_argument('--label-smooth', action='store', type=float, dest='label_smooth', default=.1)
+    parser.add_argument('--log-file', action='store', type=str)
 
-    args = parser.parse_args()
+    return parser.parse_args()
+
+
+def setup_logger(args):
+    log_file = args.log_file
+    if args.log_file is None:
+        if args.name == '':
+            log_file = 'train.log'
+        else:
+            log_file = args.name + '.log'
+
+    print('Logging to: ' + log_file)
+
+    logging.basicConfig(filename=log_file, level=logging.INFO)
+
+
+def main():
+
+    args = parse_args()
+    setup_logger(args)
 
     checkpoint_path = 'checkpoint-{}'.format(args.name)
     os.makedirs(checkpoint_path, exist_ok=True)
@@ -119,9 +143,8 @@ def main():
 
     for epoch in trange(args.epochs):
         train(epoch, train_data, conv_e, criterion, optimizer, args)
-        if epoch % 3 == 0:
-            valid(train_data, conv_e, args.batch_size)
-            valid(valid_data, conv_e, args.batch_size)
+        valid(train_data, conv_e, args.batch_size)
+        valid(valid_data, conv_e, args.batch_size)
 
         with open('{}/checkpoint_{}.model'.format(checkpoint_path, str(epoch + 1).zfill(2)), 'wb') as f:
             torch.save(conv_e, f)
