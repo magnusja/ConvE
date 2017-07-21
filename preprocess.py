@@ -134,10 +134,12 @@ def parse_args():
     sub_parsers.required = True
     train_parser = sub_parsers.add_parser('train', help='Preprocess a training set')
     valid_parser = sub_parsers.add_parser('valid', help='Preprocess a valid or test set')
-    train_parser.add_argument('train_path', action='store', type=str)
+    train_parser.add_argument('train_path', action='store', type=str,
+                              help='Path to train dataset (csv or tsv)')
 
-    valid_parser.add_argument('train_path', action='store', type=str)
-    valid_parser.add_argument('valid_path', action='store', type=str)
+    valid_parser.add_argument('train_path', action='store', type=str, help='Path to train .pkl')
+    valid_parser.add_argument('valid_path', action='store', type=str,
+                              help='Path to valid dataset (csv or tsv)')
     return parser.parse_args()
 
 

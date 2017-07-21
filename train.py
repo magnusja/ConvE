@@ -8,7 +8,7 @@ import torch
 from torch import optim
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
-from tqdm import tqdm
+from tqdm import tqdm, trange
 
 from dataset import KnowledgeGraphDataset, collate_train, collate_valid
 from model import ConvE
@@ -25,27 +25,27 @@ class StableBCELoss(nn.modules.Module):
         return loss.mean()
 
 
-def train(epoch, data, conv_e, criterion, optimizer, batch_size):
+def train(epoch, data, conv_e, criterion, optimizer, args):
     train_set = DataLoader(
         KnowledgeGraphDataset(data.x, data.y, e_to_index=data.e_to_index, r_to_index=data.r_to_index),
-        collate_fn=collate_train, batch_size=batch_size, num_workers=4, shuffle=True)
+        collate_fn=collate_train, batch_size=args.batch_size, num_workers=4, shuffle=True)
 
     progress_bar = tqdm(iter(train_set))
     moving_loss = 0
 
     conv_e.train(True)
-    y_onehot = torch.LongTensor(batch_size, len(data.e_to_index))
+    y_multihot = torch.LongTensor(args.batch_size, len(data.e_to_index))
     for s, r, os in progress_bar:
         s, r = Variable(s).cuda(), Variable(r).cuda()
 
-        if s.size()[0] != batch_size:
-            y_onehot = torch.LongTensor(s.size()[0], len(data.e_to_index))
+        if s.size()[0] != args.batch_size:
+            y_multihot = torch.LongTensor(s.size()[0], len(data.e_to_index))
 
-        y_onehot.zero_()
-        y_onehot = y_onehot.scatter_(1, os, 1)
-        y_smooth = (1 - 0.1) * y_onehot.float() + 0.1 / len(data.e_to_index)
+        y_multihot.zero_()
+        y_multihot = y_multihot.scatter_(1, os, 1)
+        y_smooth = (1 - args.label_smooth) * y_multihot.float() + args.label_smooth / len(data.e_to_index)
 
-        targets = Variable(y_onehot.float(), requires_grad=False).cuda()
+        targets = Variable(y_smooth, requires_grad=False).cuda()
 
         output = conv_e(s, r)
         loss = criterion(output, targets)
@@ -88,14 +88,20 @@ def valid(data, conv_e, batch_size):
 
 def main():
     parser = argparse.ArgumentParser(description='Train ConvE with PyTorch.')
-    parser.add_argument('train_path', action='store', type=str)
-    parser.add_argument('valid_path', action='store', type=str)
+    parser.add_argument('train_path', action='store', type=str,
+                        help='Path to training .pkl produced by preprocess.py')
+    parser.add_argument('valid_path', action='store', type=str,
+                        help='Path to valid/test .pkl produced by preprocess.py')
+    parser.add_argument('--name', action='store', type=str, default='',
+                        help='name of the model, used to create a subfolder to save checkpoints')
     parser.add_argument('--batch-size', action='store', type=int, dest='batch_size', default=256)
     parser.add_argument('--epochs', action='store', type=int, dest='epochs', default=90)
+    parser.add_argument('--label-smooth', action='store', type=float, dest='label_smooth', default=.1)
 
     args = parser.parse_args()
 
-    os.makedirs('checkpoint/', exist_ok=True)
+    checkpoint_path = 'checkpoint-{}'.format(args.name)
+    os.makedirs(checkpoint_path, exist_ok=True)
     with open(args.train_path, 'rb') as f:
         train_data = AttributeDict(pickle.load(f))
     with open(args.valid_path, 'rb') as f:
@@ -111,13 +117,13 @@ def main():
     criterion = StableBCELoss()
     optimizer = optim.Adam(conv_e.parameters(), lr=0.003)
 
-    for epoch in range(args.epochs):
-        train(epoch, train_data, conv_e, criterion, optimizer, args.batch_size)
+    for epoch in trange(args.epochs):
+        train(epoch, train_data, conv_e, criterion, optimizer, args)
         if epoch % 3 == 0:
             valid(train_data, conv_e, args.batch_size)
             valid(valid_data, conv_e, args.batch_size)
 
-        with open('checkpoint/checkpoint_{}.model'.format(str(epoch + 1).zfill(2)), 'wb') as f:
+        with open('{}/checkpoint_{}.model'.format(checkpoint_path, str(epoch + 1).zfill(2)), 'wb') as f:
             torch.save(conv_e, f)
 
 
