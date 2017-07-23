@@ -1,12 +1,12 @@
-### ConvE
+# ConvE
 
 Implementation of ConvE proposed by Dettmers et al. in [Convolutional 2D Knowledge Graph Embeddings](https://arxiv.org/abs/1707.01476). You can find the official repository with knowledge graph datasets [here](https://github.com/TimDettmers/ConvE).
 
 Implementation uses [PyTorch](http://pytorch.org/).
 
-### Usage
+## Usage
 
-## Preprocessing
+### Preprocessing
 
 ```
 usage: preprocess.py [-h] {train,valid} ...
@@ -22,19 +22,19 @@ optional arguments:
   -h, --help     show this help message and exit
 ```
 
-# Training set
+#### Training set
 
 ```
 python train ../train.tsv
 ```
 
-# Validation set
+#### Validation set
 
 ```
 python valid ../train.pkl ../train.tsv
 ```
 
-## Training
+### Training
 
 ```
 python train.py ../train.pkl ../valid.pkl
