@@ -31,7 +31,7 @@ python preprocess.py train ../train.tsv
 #### Validation set
 
 ```
-python preprocess.py valid ../train.pkl ../train.tsv
+python preprocess.py valid ../train.pkl ../valid.tsv
 ```
 
 ### Training
