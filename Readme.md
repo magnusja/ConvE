@@ -25,13 +25,13 @@ optional arguments:
 #### Training set
 
 ```
-python train ../train.tsv
+python preprocess.py train ../train.tsv
 ```
 
 #### Validation set
 
 ```
-python valid ../train.pkl ../train.tsv
+python preprocess.py valid ../train.pkl ../train.tsv
 ```
 
 ### Training
